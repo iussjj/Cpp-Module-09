@@ -1,37 +1,50 @@
 #include "BitcoinExchange.hpp"
 #include <iostream>
 #include <fstream>
-#include <sstream>
-#include <chrono>
 #include <string>
 #include <optional>
+#include <stdexcept>
+#include <cctype>
 
 namespace {
 
 	/*
 		checks for correct date format, used in processing both
 		database and input files
+		correct format: YYYY-MM-DD
 	*/
 	bool isValidDate(const std::string& date) {
 
-		if (date.length() != 10) {
+		if (date.length() != 10) return false;
+
+		if (date[4] != '-' || date[7] != '-') return false;
+
+		for (int i = 0; i < 10; ++i) {
+			if (i == 4 || i == 7) continue;
+			
+			if (!isdigit(date[i])) return false;
+		}
+
+		int year, month, day;
+		try {
+			year = std::stoi(date.substr(0, 4));
+			month = std::stoi(date.substr(5, 2));
+			day = std::stoi(date.substr(8, 2));
+		} catch (...) {
 			return false;
 		}
 
-		// wrap date string in an input stream object
-		std::istringstream date_stream(date);
-		
-		//declare C++20 calendar object with specified format
-		std::chrono::year_month_day ymd;
+		if (month < 1 || month > 12 || day < 1 || day > 31) return false;
 
-		// feed input stream into parse function, which populates calendar object
-		// %F is a shortcut for %Y-%m-%d which corresponds to YYYY-MM-DD format
-		// if input invalid, stream state is set to false (invalid)
-		date_stream >> std::chrono::parse("%F", ymd);
+		int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		// in case of invalid format, date_stream return false
-		// ymd.ok() checks validity of date against gregorian calendar
-		return date_stream && ymd.ok();
+		if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
+			daysInMonth[2] = 29;
+		}
+
+		if (day > daysInMonth[month]) return false;
+
+		return true;
 	}
 
 	/*
@@ -90,7 +103,53 @@ namespace {
 		return {date, *price};
 	}
 
-}
+	double parseInputValue(const std::string& valueString, const std::string& wholeLine) {
+		size_t pos = 0;
+		double value = 0.0;
+
+		try {
+			value = std::stod(valueString, &pos);
+		}
+		// catches completely invalid inputs like 'lol XD'
+		catch (const std::invalid_argument&) {
+			throw std::runtime_error("Error: bad input => " + wholeLine);
+		}
+		catch (const std::out_of_range&) {
+			throw std::runtime_error("Error: too large a number.");
+		}
+		
+		//catch trailing invalid characters
+		if (pos != valueString.length()) {
+			throw std::runtime_error("Error: bad input => " + wholeLine);
+		}
+
+		if (value < 0) {
+			throw std::runtime_error("Error: not a positive number.");
+		}
+
+		if (value > 1000) {
+			throw std::runtime_error("Error: too large a number.");
+		}
+
+		return value;
+	}
+
+	std::pair<std::string, double> processInputLine(const std::string& line) {
+		size_t pos = line.find(" | ");
+		if (pos == std::string::npos) {
+			throw std::runtime_error("Error: bad input => " + line);
+		}
+		std::string date = line.substr(0, pos);
+		if (!isValidDate(date)) {
+			throw std::runtime_error("Error: bad input => " + line);
+		}
+		double value = parseInputValue(line.substr(pos + 3), line);
+		return {date, value};
+
+	}
+
+} //namespace
+
 /*
 	iterates through all database csv lines, validates and extracts the values,
 	and populates the priceData_ map with them. 
@@ -99,7 +158,7 @@ void BitcoinExchange::parsePriceData(const std::string& filename) {
 
 	std::ifstream file(filename);
 	if (!file.is_open()) {
-		throw std::runtime_error("Could not open database file.");
+		throw std::runtime_error("Error: could not read database.");
 	}
 
 	std::string line;
@@ -124,7 +183,7 @@ void BitcoinExchange::parsePriceData(const std::string& filename) {
 			//insert values into map
 			priceData_[date] = price;
 	}
- }
+}
 
 // default constructor calls parametrized constructor
 BitcoinExchange::BitcoinExchange() : BitcoinExchange("data.csv") {}
@@ -145,6 +204,49 @@ BitcoinExchange& BitcoinExchange::operator=(const BitcoinExchange& source) {
 }
 
 // reads user-provided file
-void BitcoinExchange::readFile(std::string_view filename) {
+void BitcoinExchange::processFile(const std::string& filename) {
+	std::ifstream file(filename);
+	if (!file.is_open()) {
+		throw std::runtime_error("Error: could not open file.");
+	}
 
+	std::string line;
+	// skip input header line
+	std::getline(file, line);
+
+	while (getline(file, line)) {
+		if (line.empty()) {
+			continue;
+		}
+		try {
+			auto [date, value] = processInputLine(line);
+
+			// exact date OR closest date after it
+			// NOTE: subject calls for closest date BEFORE
+			auto it = priceData_.lower_bound(date);
+
+			// if input date is earlier than the first database entry
+			if (it == priceData_.begin() && it -> first != date) {
+				std::cerr	<< "Error: requested date " << date << " predates earliest database entry "
+							<< it->first << std::endl;
+				continue;
+			}
+
+			//if lower_bound() didn't find an exact match
+			if (it == priceData_.end() || it->first != date) {
+				// decrement iterator to match subject requirement
+				--it;
+			}
+
+			double rate = it->second;
+
+			// to access map values, use .at(date) NOT [date]
+			// with [], nonexistent keys are created with zero values
+			std::cout	<< date << " => " << value << " = "
+						<< (rate * value) << std::endl;
+		} catch (const std::exception& e) {
+			// catches errors and outputs the message
+			std::cerr << e.what() << std::endl;
+		}
+	}
 }

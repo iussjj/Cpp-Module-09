@@ -17,13 +17,7 @@ public:
 	BitcoinExchange(const BitcoinExchange& source);
 	BitcoinExchange& operator=(const BitcoinExchange& source);
 
-	// reads user-provided file
-	void readFile(std::string_view filename);
+	// reads user-provided file and outputs data
+	void processFile(const std::string& filename);
 
 };
-
-/*
-	NOTES:
-	std::string_view is efficient for read-only: no memory allocation and near-instant
-	substring operations like .substr(), .remove_prefix() or remove_suffix().
-*/
