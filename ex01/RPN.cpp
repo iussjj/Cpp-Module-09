@@ -56,14 +56,18 @@ void RPN::calculate(const std::string& expression) {
 	while (iss >> token) {
 		if (token.length() > 1) throw std::runtime_error("Error");
 
-		if (std::isdigit(token[0])) {
+		else if (std::isdigit(token[0])) {
 			stack_.push(std::stoi(token));
 		}
 
-		if (token == "+" || token == "-" || token == "*" || token == "/") {
+		else if (token == "+" || token == "-" || token == "*" || token == "/") {
 			performMath(token[0]);
 		}
-		
 
+		else throw std::runtime_error("Error");
 	}
+
+	if (stack_.size() != 1) throw std::runtime_error("Error");
+
+	std::cout << stack_.top() << std::endl;
 }
