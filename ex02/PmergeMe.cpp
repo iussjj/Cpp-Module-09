@@ -33,8 +33,31 @@ namespace {
 		std::optional<std::size_t> partnerId;
 	};
 
+	/*
+		Returns the end of the allowed search range, defined by the position of the item's original
+		partner in mainChain
+	*/
+
+	std::vector<Item>::iterator findPartner(std::vector<Item>& mainChain, const Pending& item) {
+
+		// handle straggler case: whole mainChain needs to be searched
+		if (!item.partnerId.has_value()) {
+			return mainChain.end();
+		}
+
+		// search mainchain for id whose value matches current pending item's partnerId
+		for (auto it = mainChain.begin(); it != mainChain.end(); ++it) {
+			if (it->id == item.partnerId.value()) {
+				return it;
+			}
+		}
+
+		// not a straggler but still no partner in mainChain: bug
+		throw std::runtime_error("Error");
+	}
+
 	void insertPendingItem(std::vector<Item>& mainChain, const Pending& item) {
-		
+
 	}
 
 	/*
