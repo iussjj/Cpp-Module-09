@@ -1,0 +1,222 @@
+#include "PmergeMe.hpp"
+
+#include <cctype>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+
+/*
+	Pairs give us known upper bounds.
+	Binary search places the pending elements.
+	Jacobsthal chooses the order that makes those binary searches cheap.
+*/
+
+
+
+namespace {
+
+	struct Item {
+		int value;
+		std::size_t id;
+	};
+
+	struct Pair {
+		Item small;
+		Item big;
+	};
+
+	struct Pending {
+		Item small;
+		// Id of big value that the small value was paired with
+		std::optional<std::size_t> partnerId;
+	};
+
+	void insertPendingItem(std::vector<Item>& mainChain, const Pending& item) {
+		
+	}
+
+	/*
+		Returns a vector of pending chain indices, used to determine the order
+		in which elements should be inserted into the main chain.
+		The purpose is to ensure that *binary searches are as cheap as possible*
+		-fewer comparisons, not necessarily fewer moves or les total runtime
+	*/
+	std::vector<std::size_t> buildJacobsthalOrder(std::size_t pendingCount) {
+		std::vector<std::size_t> order;
+
+		if (pendingCount == 0){
+			return order;
+		}
+
+		// prevBoundary 1 is small #1, boundary 3 is small #3
+		// the following means all elements after 1, up to and including 3
+		std::size_t prevBoundary = 1;
+		std::size_t boundary = 3;
+		// small # of last item in pending
+		const std::size_t lastSmall = pendingCount + 1;
+
+		while (boundary <= lastSmall) {
+
+			for (std::size_t small = boundary; small > prevBoundary; --small) {
+				// small #2 == pending[0]
+				// small #3 == pending[1]
+				std::size_t index = small - 2;
+				
+
+				order.push_back(index);
+			}
+
+			// Jacobsthal recurrence: next = current + 2 * previous
+			std::size_t nextBoundary = boundary + 2 * prevBoundary;
+			prevBoundary = boundary;
+			boundary = nextBoundary;
+		}
+
+		// handle incomplete final group (not enough smalls for full
+		// Jacobsthal range remaining)
+		for (std::size_t small = lastSmall; small > prevBoundary; --small) {
+			std::size_t index = small - 2;
+			order.push_back(index);
+		}
+		return order;
+	}
+
+	std::vector<Item> mergeInsertionSortVec(std::vector<Item> input) {
+		
+		// base case to stop recursion
+		if (input.size() <= 1) {
+			return input;
+		}
+
+		bool hasStraggler = (input.size() % 2 != 0);
+		Item straggler {};
+		if (hasStraggler) {
+			straggler = input.back();
+		}
+
+		// group input into pairs so that each pair's first.value <= second.value
+		std::vector<Pair> pairs;
+		for (std::size_t i = 0; i + 1 < input.size(); i += 2) {
+			Item first = input[i];
+			Item second = input[i + 1];
+			if (first.value > second.value) {
+				std::swap(first, second);
+			}
+			pairs.push_back({first, second});
+		}
+
+		// collect larger element from each pair
+		std::vector<Item> winners;
+		for (const Pair& pair : pairs) {
+			winners.push_back(pair.big);
+		}
+
+		// further sort winners recursively
+		winners = mergeInsertionSortVec(winners);
+
+		// reorder pairs based on sorted winners
+		std::vector<Pair> sortedPairs;
+		for (const Item& winner : winners) {
+			for (const Pair& pair : pairs) {
+				if (pair.big.id == winner.id) {
+					sortedPairs.push_back(pair);
+					break; // matching pair found, move to next winner
+				}
+			}
+		}
+
+		// build starting main chain
+		std::vector<Item> mainChain;
+		mainChain.push_back(sortedPairs[0].small);
+		for (const Pair& pair : sortedPairs) {
+			mainChain.push_back(pair.big);
+		}
+
+		// build pending chain and insert straggler if there is one
+		std::vector<Pending> pendingChain;
+		for (std::size_t i = 1; i < sortedPairs.size(); ++i) {
+			pendingChain.push_back({ sortedPairs[i].small, sortedPairs[i].big.id });
+		}
+		if (hasStraggler) {
+			pendingChain.push_back({ straggler, std::nullopt });
+		}
+
+		// generate order in which to insert elements from pending to main chain
+		std::vector<std::size_t> order = buildJacobsthalOrder(pendingChain.size());
+
+	}
+
+} //namespace
+
+PmergeMe::PmergeMe() {}
+PmergeMe::~PmergeMe() {}
+PmergeMe::PmergeMe(const PmergeMe& src) : vec_(src.vec_), deq_(src.deq_) {}
+
+PmergeMe& PmergeMe::operator=(const PmergeMe& src) {
+	if (this != &src) {
+		vec_ = src.vec_;
+		deq_ = src.deq_;
+	}
+	return *this;
+}
+
+void	PmergeMe::parseInput_(int argc, char** argv) {
+	if (argc < 2) {
+		throw std::runtime_error("Error");
+	}
+	std::string input;
+	for (int i = 1; i < argc; i++) {
+		input += argv[i];
+		input += " ";
+	}
+
+	std::istringstream iss(input);
+	std::string token;
+
+	while (iss >> token) {
+		size_t start = 0;
+		if (token[0] == '+') {
+			if (token.length() == 1) {
+				throw std::runtime_error("Error");
+			}
+			start = 1;
+		}
+		for (size_t i = start; i < token.length(); i++) {
+			if (!std::isdigit(token[i])) {
+				throw std::runtime_error("Error");
+			}
+		}
+		try {
+			long long val = std::stoll(token);
+			if (val < 0 || val > std::numeric_limits<int>::max()) {
+				throw std::runtime_error("Error");
+			}
+			vec_.push_back(static_cast<int>(val));
+			deq_.push_back(static_cast<int>(val));
+		} catch (const std::exception& e) {
+			throw std::runtime_error("Error");
+		}
+	}
+}
+
+PmergeMe::PmergeMe(int argc, char** argv) {
+	parseInput_(argc, argv);
+}
+
+void PmergeMe::sortVec_() {
+
+	// construct input: assign each value an id (to identify duplicate values)
+	std::vector<Item> input;
+	for (std::size_t i = 0; i < vec_.size(); i++) {
+		input.push_back({vec_[i], i});
+	}
+
+	// recursively ford-johnson input
+	input = mergeInsertionSortVec(input);
+
+	for (std::size_t i = 0; i < input.size(); ++i) {
+		vec_[i] = input[i].value;
+	}
+}
