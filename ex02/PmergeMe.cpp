@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 /*
 	Pairs give us known upper bounds.
@@ -18,7 +19,7 @@
 
 namespace {
 
-	std::size_t comparisonCount = 0;
+	//std::size_t comparisonCount = 0;
 
 	struct Item {
 		int value;
@@ -36,8 +37,16 @@ namespace {
 		std::optional<std::size_t> partnerId;
 	};
 
+	template <typename Container>
+	void printSequence(const Container& values) {
+		for (int value : values) {
+			std::cout << value << ' ';
+		}
+		std::cout << std::endl;
+	}
+
 	bool compareItems(const Item& a, const Item& b) {
-		++comparisonCount;
+		//++comparisonCount;
 		return a.value < b.value;
 	}
 
@@ -195,7 +204,7 @@ namespace {
 		for (std::size_t i = 0; i + 1 < input.size(); i += 2) {
 			Item first = input[i];
 			Item second = input[i + 1];
-			++comparisonCount;
+			//++comparisonCount;
 			if (first.value > second.value) {
 				std::swap(first, second);
 			}
@@ -265,7 +274,7 @@ namespace {
 		for (std::size_t i = 0; i + 1 < input.size(); i += 2) {
 			Item first = input[i];
 			Item second = input[i + 1];
-			++comparisonCount;
+			//++comparisonCount;
 			if (first.value > second.value) {
 				std::swap(first, second);
 			}
@@ -316,10 +325,11 @@ namespace {
 
 PmergeMe::PmergeMe() {}
 PmergeMe::~PmergeMe() {}
-PmergeMe::PmergeMe(const PmergeMe& src) : vec_(src.vec_), deq_(src.deq_) {}
+PmergeMe::PmergeMe(const PmergeMe& src) : input_(src.input_), vec_(src.vec_), deq_(src.deq_) {}
 
 PmergeMe& PmergeMe::operator=(const PmergeMe& src) {
 	if (this != &src) {
+		input_ = src.input_;
 		vec_ = src.vec_;
 		deq_ = src.deq_;
 	}
@@ -357,11 +367,13 @@ void	PmergeMe::parseInput_(int argc, char** argv) {
 			if (val <= 0 || val > std::numeric_limits<int>::max()) {
 				throw std::runtime_error("Error");
 			}
-			vec_.push_back(static_cast<int>(val));
-			deq_.push_back(static_cast<int>(val));
+			input_.push_back(static_cast<int>(val));
 		} catch (const std::exception& e) {
 			throw std::runtime_error("Error");
 		}
+	}
+	if (input_.empty()) {
+		throw std::runtime_error("Error");
 	}
 }
 
@@ -371,7 +383,7 @@ PmergeMe::PmergeMe(int argc, char** argv) {
 
 void PmergeMe::sortVec_() {
 
-	comparisonCount = 0;
+	//comparisonCount = 0;
 
 	// construct input: assign each value an id (to identify duplicate values)
 	std::vector<Item> input;
@@ -392,7 +404,7 @@ void PmergeMe::sortVec_() {
 
 void PmergeMe::sortDeq_() {
 
-	comparisonCount = 0;
+	//comparisonCount = 0;
 
 	std::deque<Item> input;
 	for (std::size_t i = 0; i < deq_.size(); i++) {
@@ -407,30 +419,28 @@ void PmergeMe::sortDeq_() {
 
 	//std::cout << "Deque implementation comparison count: " << comparisonCount << std::endl;
 }
-
+/*
+	container filling is handled here, so that all data management is included in
+	the timed interval
+	
+*/
 void PmergeMe::sort() {
+	std::cout << "Before: ";
+	printSequence(input_);
+	auto vecStart = std::chrono::steady_clock::now();
+	vec_ = input_;
 	sortVec_();
+	auto vecEnd = std::chrono::steady_clock::now();
+	double vecTime = std::chrono::duration<double, std::micro>(vecEnd - vecStart).count();
+	auto deqStart = std::chrono::steady_clock::now();
+	deq_.assign(input_.begin(), input_.end());
 	sortDeq_();
-}
-
-void PmergeMe::printVec() const {
-	for (std::size_t i = 0; i < vec_.size(); ++i) {
-		std::cout << vec_[i];
-
-		if (i + 1 < vec_.size())
-			std::cout << ' ';
-	}
-
-	std::cout << std::endl;
-}
-
-void PmergeMe::printDeq() const {
-	for (std::size_t i = 0; i < deq_.size(); ++i) {
-		std::cout << deq_[i];
-
-		if (i + 1 < deq_.size())
-			std::cout << ' ';
-	}
-
-	std::cout << std::endl;
+	auto deqEnd = std::chrono::steady_clock::now();
+	double deqTime = std::chrono::duration<double, std::micro>(deqEnd - deqStart).count();
+	std::cout << "After: ";
+	printSequence(vec_);
+	std::cout	<< "Time to process a range of " << vec_.size()
+				<< " elements with std::vector : " << vecTime << " µs" << std::endl;
+	std::cout	<< "Time to process a range of " << deq_.size()
+				<< " elements with std::deque : " << deqTime << " µs" << std::endl;
 }

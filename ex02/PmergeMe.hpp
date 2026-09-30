@@ -5,6 +5,7 @@
 
 class PmergeMe {
 private:
+	std::vector<int> input_;
 	std::vector<int> vec_;
 	std::deque<int> deq_;
 
@@ -21,6 +22,4 @@ public:
 	PmergeMe(int argc, char** argv);
 
 	void sort();
-	void printVec() const; //for testing
-	void printDeq() const; //for testing
 } ;
