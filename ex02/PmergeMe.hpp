@@ -21,4 +21,6 @@ public:
 	PmergeMe(int argc, char** argv);
 
 	void sort();
+	void printVec() const; //for testing
+	void printDeq() const; //for testing
 } ;
