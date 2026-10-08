@@ -7,7 +7,7 @@
 class RPN {
 private:
 	//by default, stack wraps around a deque -here we use a list instead
-	std::stack<int, std::list<int> > stack_;
+	std::stack<long long, std::list<long long> > stack_;
 	void performMath(char operand);
 
 public:

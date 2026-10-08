@@ -3,7 +3,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <cctype>
 
 RPN::RPN() {}
 RPN::~RPN() {}
@@ -20,10 +19,10 @@ void RPN::performMath(char operand) {
 		throw std::runtime_error("Error");
 	}
 
-	int right = stack_.top();
+	long long right = stack_.top();
 	stack_.pop();
 
-	int left = stack_.top();
+	long long left = stack_.top();
 	stack_.pop();
 
 	switch (operand) {
@@ -56,7 +55,7 @@ void RPN::calculate(const std::string& expression) {
 	while (iss >> token) {
 		if (token.length() > 1) throw std::runtime_error("Error");
 
-		else if (std::isdigit(token[0])) {
+		else if (token[0] >= '0' && token[0] <= '9') {
 			stack_.push(std::stoi(token));
 		}
 
