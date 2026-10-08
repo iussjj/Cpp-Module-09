@@ -1,10 +1,13 @@
 #include "BitcoinExchange.hpp"
-#include <iostream>
+#include <cctype>
+#include <cmath>
+#include <cstddef>
 #include <fstream>
-#include <string>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
-#include <cctype>
+#include <string>
+#include <utility>
 
 namespace {
 
@@ -22,7 +25,7 @@ namespace {
 		for (int i = 0; i < 10; ++i) {
 			if (i == 4 || i == 7) continue;
 			
-			if (!isdigit(date[i])) return false;
+			if (!isdigit(static_cast<unsigned char>(date[i]))) return false;
 		}
 
 		int year, month, day;
@@ -55,7 +58,7 @@ namespace {
 		
 		//stod doesn't consume trailing invalid characters,
 		//so pos is compared against number.length()
-		size_t pos = 0;
+		std::size_t pos = 0;
 		double price = 0.0;
 
 		try {
@@ -67,7 +70,7 @@ namespace {
 		}
 
 		// catches trailing invalid characters and negative numbers
-		if (pos < number.length() || price < 0) {
+		if (pos < number.length() || price < 0 || !std::isfinite(price)) {
 			return std::nullopt;
 		}
 
@@ -80,7 +83,7 @@ namespace {
 	std::pair<std::string, double> processDatabaseLine(const std::string& line) {
 
 		// check for at least one delineator
-		size_t pos = line.find(',');
+		std::size_t pos = line.find(',');
 		if (pos == std::string::npos) {
 			throw std::runtime_error(std::string("Invalid database."));
 		}
@@ -104,7 +107,7 @@ namespace {
 	}
 
 	double parseInputValue(const std::string& valueString, const std::string& wholeLine) {
-		size_t pos = 0;
+		std::size_t pos = 0;
 		double value = 0.0;
 
 		try {
@@ -123,6 +126,11 @@ namespace {
 			throw std::runtime_error("Error: bad input => " + wholeLine);
 		}
 
+		//handle nan, inf and -infinity edge case
+		if (!std::isfinite(value)) {
+			throw std::runtime_error("Error: bad input => " + wholeLine);
+		}
+
 		if (value < 0) {
 			throw std::runtime_error("Error: not a positive number.");
 		}
@@ -135,7 +143,7 @@ namespace {
 	}
 
 	std::pair<std::string, double> processInputLine(const std::string& line) {
-		size_t pos = line.find(" | ");
+		std::size_t pos = line.find(" | ");
 		if (pos == std::string::npos) {
 			throw std::runtime_error("Error: bad input => " + line);
 		}
@@ -182,6 +190,9 @@ void BitcoinExchange::parsePriceData(const std::string& filename) {
 
 			//insert values into map
 			priceData_[date] = price;
+	}
+	if (priceData_.empty()) {
+		throw std::runtime_error("Error: database contains no price data.");
 	}
 }
 
